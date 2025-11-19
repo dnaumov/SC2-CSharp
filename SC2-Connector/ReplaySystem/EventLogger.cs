@@ -21,7 +21,7 @@ namespace SC2_Connector.ReplaySystem
         /// <summary>
         /// Gets all logged events
         /// </summary>
-        public IReadOnlyList<ReplayEvent> Events => events.AsReadOnly();
+        public List<ReplayEvent> Events => new List<ReplayEvent>(events);
 
         /// <summary>
         /// Logs a unit/building creation event
@@ -96,9 +96,16 @@ namespace SC2_Connector.ReplaySystem
         /// </summary>
         private bool IsBuilding(uint unitType)
         {
-            // Check if the unit type is in the building categories
-            // Using common building type ranges for all races
-            return Units.Buildings.Contains(unitType);
+            // Try to get building size - if it succeeds, it's a building
+            try
+            {
+                BuildingType.GetBuildingSize(unitType);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>
