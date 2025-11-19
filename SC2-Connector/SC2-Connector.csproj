@@ -38,6 +38,7 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -71,6 +72,9 @@
     <Compile Include="Protocol\Score.cs" />
     <Compile Include="Protocol\Spatial.cs" />
     <Compile Include="Protocol\Ui.cs" />
+    <Compile Include="ReplaySystem\EventLogger.cs" />
+    <Compile Include="ReplaySystem\EventPlayer.cs" />
+    <Compile Include="ReplaySystem\ReplayEvent.cs" />
     <Compile Include="Wrapper\CommandLine.cs" />
     <Compile Include="Wrapper\GameConnection.cs" />
     <Compile Include="Wrapper\Interface.cs" />

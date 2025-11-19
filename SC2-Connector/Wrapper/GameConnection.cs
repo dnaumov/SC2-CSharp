@@ -5,6 +5,7 @@ using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 using SC2APIProtocol;
+using SC2_Connector.ReplaySystem;
 
 namespace SC2_Connector
 {
@@ -277,6 +278,102 @@ namespace SC2_Connector
                 }
             }
             return response;
+        }
+
+        /// <summary>
+        /// Starts a replay and logs events to a file
+        /// </summary>
+        public async Task RunReplayAndLogEvents(string replayPath, int observedPlayerId, string outputLogPath) {
+            var port = 5679;
+            Logger.Info("Starting Replay Analysis Instance");
+            StartSC2Instance(port);
+            Logger.Info("Connecting to port: {0}", port);
+            await Connect(port);
+            Logger.Info("Starting replay: {0}", replayPath);
+            await StartReplay(replayPath, observedPlayerId);
+            await RunReplayWithLogging(observedPlayerId, outputLogPath);
+        }
+
+        private async Task StartReplay(string replayPath, int observedPlayerId) {
+            if (!File.Exists(replayPath)) {
+                Logger.Info("Unable to locate replay: " + replayPath);
+                throw new Exception("Unable to locate replay: " + replayPath);
+            }
+
+            var startReplay = new RequestStartReplay();
+            startReplay.ReplayPath = replayPath;
+            startReplay.ObservedPlayerId = observedPlayerId;
+            
+            startReplay.Options = new InterfaceOptions();
+            startReplay.Options.Raw = true;
+            startReplay.Options.Score = true;
+            
+            startReplay.DisableFog = false;
+            startReplay.Realtime = false;
+
+            var request = new Request();
+            request.StartReplay = startReplay;
+            var response = CheckResponse(await proxy.SendRequest(request));
+
+            if(response.StartReplay.Error != ResponseStartReplay.Types.Error.Unset) {
+                Logger.Error("StartReplay error: {0}", response.StartReplay.Error.ToString());
+                if(!String.IsNullOrEmpty(response.StartReplay.ErrorDetails)) {
+                    Logger.Error(response.StartReplay.ErrorDetails);
+                }
+                throw new Exception("Failed to start replay");
+            }
+
+            Logger.Info("Replay started successfully");
+        }
+
+        private async Task RunReplayWithLogging(int observedPlayerId, string outputLogPath) {
+            var gameInfoReq = new Request();
+            gameInfoReq.GameInfo = new RequestGameInfo();
+            var gameInfoResponse = await proxy.SendRequest(gameInfoReq);
+
+            var dataReq = new Request();
+            dataReq.Data = new RequestData();
+            dataReq.Data.UnitTypeId = true;
+            dataReq.Data.AbilityId = true;
+            dataReq.Data.BuffId = true;
+            dataReq.Data.EffectId = true;
+            dataReq.Data.UpgradeId = true;
+            var dataResponse = await proxy.SendRequest(dataReq);
+
+            Controller.GameInfo = gameInfoResponse.GameInfo;
+            Controller.GameData = dataResponse.Data;
+
+            var eventLogger = new EventLogger();
+            Logger.Info("Starting event logging from replay...");
+
+            while (true) {
+                var observationRequest = new Request();
+                observationRequest.Observation = new RequestObservation();
+                var response = await proxy.SendRequest(observationRequest);
+
+                var observation = response.Observation;
+
+                if (response.Status == Status.Ended || response.Status == Status.Quit) {
+                    Logger.Info("Replay ended");
+                    break;
+                }
+
+                Controller.Observation = observation;
+                Controller.OpenFrame();
+
+                // Log events from this frame
+                eventLogger.ProcessFrame(Controller.Frame, Controller.ObservableUnits, observedPlayerId);
+
+                var stepRequest = new Request();
+                stepRequest.Step = new RequestStep();
+                stepRequest.Step.Count = stepSize;
+                await proxy.SendRequest(stepRequest);
+            }
+
+            // Save the logged events
+            eventLogger.SaveToFile(outputLogPath);
+            Logger.Info("Event logging complete");
+            Logger.Info(eventLogger.GetSummary());
         }
     }
 }
