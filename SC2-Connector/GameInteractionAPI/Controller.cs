@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using SC2APIProtocol;
+using SC2_Connector.ReplaySystem;
 using Action = SC2APIProtocol.Action;
 
 namespace SC2_Connector
@@ -66,6 +67,12 @@ namespace SC2_Connector
                         else StartLocation = location;
                     }
                 }
+            }
+
+            // Process event player if enabled
+            if (EventPlayer != null && EventPlayer.IsEnabled)
+            {
+                EventPlayer.ProcessFrame(Frame);
             }
 
             if (frameDelay > 0)
@@ -184,6 +191,7 @@ namespace SC2_Connector
         #region Public 
         #region State
         public static GameConnection Connection;
+        public static EventPlayer EventPlayer;
 
         public static ulong Frame;
         public static uint CurrentSupply;
